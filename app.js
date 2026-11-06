@@ -142,7 +142,7 @@ function sidebar(k, p) {
       + `<tr class="st"><td>steil</td><td>${st(c.nu)}</td><td>${st(c.week)}</td><td>${st(c.maand)}</td></tr></table>
       <div class="small">Steilheid = 20j min 5j. Peildata: nu ${dm(c.peil)} · week ${dm(c.week_peil)} · maand ${dm(c.maand_peil)}</div></div>`;
   }
-  h += `<div class="sh">Toelichting</div><div class="small">Rente: gemiddelde van de 5 laagste tarieven 10 jaar vast bij 100% LTV (Moneywise, ${dm(k.rente_peil)}). Swap: slot ${dm(k.swap_slot)} (BlueGamma). Marge: rente − swap, norm 125 bp. Top 5: laagste reguliere tarief per aanbieder, zonder groene producten (Moneywise, ${dm(k.top5_stand)}); Argenta en Vista blauw, Centraal Beheer, Syntrus en Attens groen.${k.bronnoot ? " " + esc(k.bronnoot) : ""}</div></details>`;
+  h += `<div class="sh">Toelichting</div><div class="small">Rente: gemiddelde van de 5 laagste tarieven 10 jaar vast bij 100% LTV (Moneywise, ${dm(k.rente_peil)}). Swap: slot ${dm(k.swap_slot)} (BlueGamma). Marge: rente − swap, norm 125 bp. Rentecurve: gemiddelde van de 5 laagste NHG-tarieven per looptijd (5, 10 en 20 jaar), zelfde methode en bron als de top 5, dus de 10j-waarde is gelijk aan het gemiddelde van de top 5 met NHG. Top 5: laagste reguliere tarief per aanbieder, zonder groene producten (Moneywise, ${dm(k.top5_stand)}); Argenta en Vista blauw, Centraal Beheer, Syntrus en Attens groen.${k.bronnoot ? " " + esc(k.bronnoot) : ""}</div></details>`;
   return h;
 }
 
@@ -234,7 +234,7 @@ const CH = {}; let chSeq = 0; // per grafiek: schaalfuncties en data voor de hov
 async function grafiekenView() {
   const my = rid;
   $("#kicker").textContent = "Grafieken"; $("#sub").innerHTML = ""; loading();
-  const { data, error } = await sb.from("kerncijfers").select("datum,rente10_ltv100,swap10,marge_bp,curve").order("datum");
+  const { data, error } = await sb.from("kerncijfers").select("datum,rente10_ltv100,swap10,marge_bp,top5_nhg").order("datum");
   if (my !== rid) return;
   if (error) return fail(error);
   if (!data.length) { main.innerHTML = `<div class="empty">Nog geen kerncijfers in de database.</div>`; return; }
@@ -246,11 +246,12 @@ async function grafiekenView() {
     const n = +$("#rng").value;
     const cut = n ? iso(new Date(Date.now() - n * 864e5)) : "";
     const rows = data.filter((r) => r.datum >= cut);
+    const avg5 = (l) => (Array.isArray(l) && l.length ? l.reduce((a, x) => a + +x[1], 0) / l.length : null);
     const pts = (f) => rows.filter((r) => f(r) != null).map((r) => ({ x: r.datum, y: +f(r) }));
     ch.innerHTML = [
       chart("Hypotheekrente 10j (100% LTV) en swaprente 10j, %", [["Hypotheekrente", pts((r) => r.rente10_ltv100), "#4F46E5"], ["Swaprente", pts((r) => r.swap10), "#0EA5E9"]], 2),
       chart("Rentemarge (bp), norm 125", [["Marge", pts((r) => r.marge_bp), "#D97706"]], 0, 125),
-      chart("Rentecurve NHG 10j (%)", [["10j NHG", pts((r) => r.curve && r.curve.nu && r.curve.nu[1]), "#16A34A"]], 2),
+      chart("Gemiddelde 5 laagste tarieven met NHG, 10j (%)", [["Top 5 NHG", pts((r) => avg5(r.top5_nhg)), "#16A34A"]], 2),
     ].join("");
   };
   // Hover/aanraken: cursorlijn, punten en een tekstballon met de waarden op die datum.

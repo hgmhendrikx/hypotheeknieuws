@@ -16,10 +16,10 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 
 | Tijd (Europe/Amsterdam) | Taak | Bestand |
 |---|---|---|
-| ma–za 06:55 | Feedrun: RSS en nieuwspagina's uit tabel `bronnen` | `runs/feedrun.md` |
-| ma–za 07:10 | Dagrun: onderzoek door subagents, kerncijfers, top 3 | `runs/dagrun-onderzoek.md` |
-| za 07:45 | Weekoverzicht, opgebouwd uit de dagedities | `runs/weekoverzicht.md` |
-| ma–za 08:20 | Controle (alleen lezen), meldt OK of ALARM | `runs/controle-dagrun.md` |
+| ma–vr 06:55 | Feedrun: RSS en nieuwspagina's uit tabel `bronnen` | `runs/feedrun.md` |
+| ma–vr 07:10 | Dagrun: onderzoek door subagents, kerncijfers, top 3 | `runs/dagrun-onderzoek.md` |
+| vr 09:00 | Weekoverzicht, opgebouwd uit de dagedities | `runs/weekoverzicht.md` |
+| ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite), meldt OK of ALARM | `runs/controle-dagrun.md` |
 
 De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron van waarheid; houd de kopie bij als de taak verandert.
 
