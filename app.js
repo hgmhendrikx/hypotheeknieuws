@@ -224,7 +224,7 @@ async function archiefView() {
       return head + `<div class="block" style="margin-bottom:8px">${item({ head: i.kop ? esc(i.kop) : "", text: i.zin, sub: i.waarom ? `<b>Waarom relevant:</b> ${esc(i.waarom)}` : i.impact ? `<b>Impact:</b> ${esc(i.impact)}` : "", m: meta(esc(i.categorie || i.sectie), pills(i.labels), `nieuws ${esc(dmy(i.nieuws_datum))}`, src(i.bron_naam, i.bron_url)) }).replace('class="item"', 'class="item" style="border-top:0"')}</div>`;
     }).join("");
   };
-  $("#go").onclick = run; $("#q").onkeydown = (e) => e.key === "Enter" && run();
+  $("#go").onclick = run; $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
   ["lab", "sec", "cat", "van", "tot"].forEach((id) => ($("#" + id).onchange = run));
   run();
 }
