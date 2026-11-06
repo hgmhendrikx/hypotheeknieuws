@@ -20,7 +20,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | ma–vr 07:10 | Dagrun: onderzoek door subagents, kerncijfers, top 3 | `runs/dagrun-onderzoek.md` |
 | vr 09:00 | Weekoverzicht, opgebouwd uit de dagedities | `runs/weekoverzicht.md` |
 | ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite), meldt OK of ALARM | `runs/controle-dagrun.md` |
-| vr 10:00 | Weekmail: weekoverzicht als HTML-nieuwsbrief in de mailbody naar hgmhendrikx@gmail.com | `runs/weekmail.md` |
+| vr 10:00 | Weekmail: weekoverzicht als HTML-nieuwsbrief in de mailbody naar guido.hendrikx2@achmea.nl | `runs/weekmail.md` |
 
 De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron van waarheid; houd de kopie bij als de taak verandert.
 
