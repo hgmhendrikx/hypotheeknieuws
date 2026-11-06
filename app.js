@@ -123,12 +123,12 @@ function sidebar(k, p) {
     list = (list || []).slice(0, 5);
     const spr = list.length > 1 ? bp(list[list.length - 1][1] - list[0][1]) : 0;
     const rows = list.map(([n, v], i) => `<tr><td class="n">${i + 1}</td><td class="${["Argenta", "Vista"].includes(n) ? "hl" : ["Centraal Beheer", "CB", "Syntrus", "Syntrus Achmea", "Attens"].includes(n) ? "pref" : ""}">${esc(n)}</td><td class="r">${pc(v)}%</td></tr>`).join("");
-    return `<h4>${title}</h4><table>${rows}<tr class="sp"><td colspan="3">Spreiding 1–5: <b>${spr} bp</b></td></tr></table>`;
+    return `<h4>${title}</h4><table>${rows}<tr class="sp"><td colspan="3">Gemiddelde 1–5: <b>${pc(list.reduce((t, x) => t + +x[1], 0) / (list.length || 1))}%</b> · spreiding <b>${spr} bp</b></td></tr></table>`;
   };
   // Op mobiel: de drie kerncijfers naast elkaar, de rest inklapbaar onder de samenvatting.
   const mobiel = window.matchMedia("(max-width:760px)").matches;
   let h = `<div class="sh">Rente</div><div class="kpis">`
-    + kpi("Hypotheekrente 10j (100% LTV)", pc(k.rente10_ltv100) + "%", dl(rD))
+    + kpi("Hypotheekrente 10j (100% LTV)", pc(k.rente10_ltv100) + "%", dl(rD), "gemiddelde van de top 5 laagste tarieven")
     + kpi("Swaprente 10j", pc(k.swap10) + "%", dl(sD))
     + kpi("Rentemarge", marge != null ? marge + " bp" : "n.b.", dl(mD), marge != null ? `norm 125 bp · ${sg(marge - 125)}` : "")
     + `</div><details class="more"${mobiel ? "" : " open"}><summary>Top 5, rentecurve en toelichting</summary>`
