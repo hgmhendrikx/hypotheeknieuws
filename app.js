@@ -31,6 +31,7 @@ const sg = (n) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n) + " bp";
 const CACHE_MS = 5 * 60 * 1000;
 const lists = {};
 let catCache = null;
+let liCache = null; // volglijst LinkedIn: { t, accounts }
 function editionList(soort) {
   const c = lists[soort];
   if (c && Date.now() - c.t < CACHE_MS) return c.p;
@@ -54,7 +55,7 @@ async function boot() {
 function showLogin() {
   signedIn = false;
   rid++;
-  Object.keys(lists).forEach((k) => delete lists[k]); catCache = null;
+  Object.keys(lists).forEach((k) => delete lists[k]); catCache = null; liCache = null;
   $("#main").innerHTML = ""; $("#sub").innerHTML = ""; $("#password").value = "";
   $("#app").hidden = true; $("#login").hidden = false;
 }
@@ -77,6 +78,7 @@ function route() {
   const [v = "dag", arg] = (location.hash.slice(1) || "dag").split("/");
   document.querySelectorAll(".tabs a").forEach((a) => { const on = a.dataset.v === v; a.classList.toggle("on", on); if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   if (v === "dag" || v === "week") return editionView(v, arg);
+  if (v === "linkedin") return linkedinView();
   if (v === "archief") return archiefView();
   if (v === "grafieken") return grafiekenView();
   location.hash = "#dag";
@@ -96,11 +98,17 @@ async function editionView(soort, datum) {
   if (!list.length) { main.innerHTML = `<div class="empty">Nog geen ${soort === "week" ? "weekoverzichten" : "dagoverzichten"} in de database.</div>`; $("#sub").innerHTML = ""; return; }
   const cur = list.find((x) => x.datum === datum) || list[0];
   const idx = list.indexOf(cur);
-  const [{ data: ed, error: e1 }, { data: items, error: e2 }, { data: k, error: e3 }, { data: prev }] = await Promise.all([
+  // LinkedIn: dag = wat de run die ochtend vond; week = zelfde selectie als de weekmail (database-functie linkedin_week:
+  // geplaatst za t/m vr, plus eerder geplaatste posts die sinds de vorige weekmail zijn gevonden)
+  const liQ = soort === "week"
+    ? sb.rpc("linkedin_week", { p_datum: cur.datum })
+    : sb.from("linkedin_posts").select("*").eq("gevonden_op", cur.datum).order("relevantie", { ascending: false }).order("post_datum", { ascending: false }).limit(12);
+  const [{ data: ed, error: e1 }, { data: items, error: e2 }, { data: k, error: e3 }, { data: prev }, { data: li }] = await Promise.all([
     sb.from("editions").select("*").eq("id", cur.id).single(),
     sb.from("items").select("*").eq("edition_id", cur.id).order("positie"),
     sb.from("kerncijfers").select("*").eq("datum", cur.datum).maybeSingle(),
     sb.from("kerncijfers").select("*").lte("datum", iso(new Date(dObj(cur.datum).getTime() - 7 * 864e5))).order("datum", { ascending: false }).limit(1),
+    liQ, // fout bij LinkedIn mag de editie niet blokkeren
   ]);
   if (my !== rid) return;
   if (e1 || e2 || e3) return fail(e1 || e2 || e3);
@@ -108,7 +116,7 @@ async function editionView(soort, datum) {
   const sel = `<div class="bar"><button class="btn ghost" id="nw" ${idx + 1 >= list.length ? "disabled" : ""}>← Eerder</button>
     <select id="pick" aria-label="Kies uitgave">${list.map((x) => `<option value="${x.datum}" ${x.id === cur.id ? "selected" : ""}>${esc(lang(x.datum))}</option>`).join("")}</select>
     <button class="btn ghost" id="nx" ${idx === 0 ? "disabled" : ""}>Later →</button></div>`;
-  main.innerHTML = sel + `<div class="layout"><aside class="side" aria-label="Kerncijfers">${sidebar(k, prev && prev[0])}</aside><section class="mainp">${mainPanel(soort, ed, items)}</section></div>`;
+  main.innerHTML = sel + `<div class="layout"><aside class="side" aria-label="Kerncijfers">${sidebar(k, prev && prev[0])}</aside><section class="mainp">${mainPanel(soort, ed, items, li || [])}</section></div>`;
   $("#pick").onchange = (e) => (location.hash = `#${soort}/${e.target.value}`);
   $("#nw").onclick = () => (location.hash = `#${soort}/${list[idx + 1].datum}`);
   $("#nx").onclick = () => (location.hash = `#${soort}/${list[idx - 1].datum}`);
@@ -154,7 +162,7 @@ function groupBy(arr, key) {
   return [...m.entries()];
 }
 
-function mainPanel(soort, ed, items) {
+function mainPanel(soort, ed, items, li) {
   const by = (s) => items.filter((i) => i.sectie === s);
   const top = by("top"), nws = by("nieuws"), toez = by("toezicht"), bed = by("bedrijf");
   const dui = ed.duiding || [];
@@ -166,6 +174,7 @@ function mainPanel(soort, ed, items) {
   const wt = ed.watch || [];
   out.push(block("Watchlist", wt.map((w) => item({ lead: esc(w.naam) + arrow(w.richting, w.per), text: w.tekst, m: meta(w.bron ? src(w.bron[0], w.bron[1]) : "") })).join(""), wt.length));
   out.push(block("Bedrijven in beeld", bed.map((b) => item({ lead: esc(b.categorie), text: b.zin, m: meta(pills(b.labels), src(b.bron_naam, b.bron_url)) })).join(""), bed.length));
+  if (li.length) out.push(block(soort === "week" ? "LinkedIn deze week" : "Nieuw op LinkedIn", li.map((p) => liItem(p)).join("") + `<div class="item small"><a href="#linkedin">Alle LinkedIn-posts en de volglijst →</a></div>`, li.length));
   out.push(block("Nieuws per categorie", groupBy(nws, "categorie").map(([c, its]) => `<div class="sg">${esc(c)}</div>` + its.map((i) => item({ text: i.zin, m: meta(pills(i.labels), src(i.bron_naam, i.bron_url)) })).join("")).join(""), nws.length));
   let tr = groupBy(toez, "categorie").map(([c, its]) => `<div class="sg">${esc(c)}</div>` + its.map((i) => item({ text: i.zin, sub: i.impact ? `<b>Impact:</b> ${esc(i.impact)}` : "", m: meta(pills(i.labels), src(i.bron_naam, i.bron_url)) })).join("")).join("");
   const ag = ed.agenda || [];
@@ -181,6 +190,103 @@ function mainPanel(soort, ed, items) {
   out.push(block("Vooruitblik volgende week", vb.map((x) => item({ lead: esc(x.datum), text: x.tekst, m: meta(pills(x.labels)) })).join(""), vb.length));
   out.push(`<div class="foot">${ed.niet_gevonden ? `<b>Niet gevonden of achter betaalmuur:</b> ${esc(ed.niet_gevonden)}<br>` : ""}${ed.basis ? `<b>Basis:</b> ${esc(ed.basis)}<br>` : ""}Samengesteld door Claude op basis van openbare bronnen. Labels: ${pills(["Hypo"])} hypotheekexpert · ${pills(["Digi"])} digitalisering · ${pills(["Board"])} directie.</div>`);
   return out.join("");
+}
+
+// ---------- LinkedIn-radar
+const LI_TZ = { timeZone: "Europe/Amsterdam" };
+const liDate = (ts) => { const d = new Date(ts); return `${+d.toLocaleString("nl-NL", { ...LI_TZ, day: "numeric" })}/${+d.toLocaleString("nl-NL", { ...LI_TZ, month: "numeric" })}`; };
+const liTime = (ts) => new Date(ts).toLocaleTimeString("nl-NL", { ...LI_TZ, hour: "2-digit", minute: "2-digit" });
+const liDay = (ts) => new Date(ts).toLocaleDateString("sv-SE", LI_TZ); // JJJJ-MM-DD in Nederlandse tijd
+const initials = (n) => String(n || "?").split(/\s+/).filter((w) => /^[A-ZÀ-Ý]/.test(w)).map((w) => w[0]).slice(0, 2).join("") || "?";
+const dots = (r) => `<span class="rel" title="Relevantie ${r} van 3"><span aria-hidden="true">${"●".repeat(r)}${"○".repeat(3 - r)}</span><span class="sr">relevantie ${r} van 3</span></span>`;
+
+function liItem(p, opts = {}) {
+  const u = safeUrl(p.post_url);
+  const link = u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${p.gevonden_via === "media" ? esc(p.bron_naam || "bron") : "Bekijk op LinkedIn"}</a>` : "";
+  const when = p.datum_bron === "activity_id" ? `geplaatst ${liDate(p.post_datum)} ${liTime(p.post_datum)}` : p.gevonden_via === "media" ? `artikel ${liDate(p.post_datum)}` : `geplaatst ${liDate(p.post_datum)}`;
+  const found = p.gevonden_op && p.gevonden_op !== liDay(p.post_datum) ? `gevonden ${dm(p.gevonden_op)}` : "";
+  const via = (p.gevonden_via === "media" ? `<span class="tag" title="Uitspraak uit de media; de LinkedIn-post zelf had geen vaststelbare datum">media</span>` : "")
+    + (p.laat ? ` <span class="tag" title="Geplaatst vóór deze week, maar pas na de vorige weekmail gevonden">eerder geplaatst, deze week gevonden</span>` : "");
+  const head = `<span class="av" aria-hidden="true">${esc(initials(p.auteur))}</span><span>${esc(p.auteur)}${p.functie ? ` <span class="fn">· ${esc(p.functie)}</span>` : ""}</span>`;
+  return item({ head, text: p.kern, sub: p.waarom ? `<b>Waarom relevant:</b> ${esc(p.waarom)}` : "", m: meta(dots(p.relevantie), pills(p.labels), opts.thema !== false && p.thema ? esc(p.thema) : "", esc(when), found, via, link) }).replace('class="item"', 'class="item li"');
+}
+
+async function liAccounts() {
+  if (liCache && Date.now() - liCache.t < CACHE_MS) return liCache;
+  const { data, error } = await sb.from("linkedin_accounts").select("id,soort,naam,bedrijf,functie,linkedin_url,prioriteit,actief,laatste_post,opmerking,functie_peil,functie_bron").eq("actief", true).order("prioriteit").order("naam");
+  if (error) throw error;
+  liCache = { t: Date.now(), accounts: data };
+  return liCache;
+}
+
+async function linkedinView() {
+  const my = rid;
+  $("#kicker").textContent = "LinkedIn-radar"; $("#sub").innerHTML = ""; loading();
+  let accounts, run;
+  try {
+    [{ accounts }, { data: run }] = await Promise.all([liAccounts(), sb.from("linkedin_runs").select("datum,toegevoegd,overgeslagen,created_at").order("created_at", { ascending: false }).limit(1)]);
+  } catch (e) { if (my === rid) fail(e); return; }
+  if (my !== rid) return;
+  const groups = groupBy(accounts, "bedrijf").sort((a, b) => Math.min(...a[1].map((x) => x.prioriteit)) - Math.min(...b[1].map((x) => x.prioriteit)) || a[0].localeCompare(b[0]));
+  const last = run && run[0];
+  $("#sub").innerHTML = last ? `laatste run ${esc(dmy(last.datum))}<br>${last.toegevoegd} nieuw` : "nog geen run";
+  main.innerHTML = `<div class="bar">
+    <select id="lb" aria-label="Bedrijf"><option value="">Alle bedrijven</option>${groups.map(([g]) => `<option>${esc(g)}</option>`).join("")}</select>
+    <select id="lw" aria-label="Wie"><option value="">Iedereen</option><option value="persoon">Alleen bestuurders</option><option value="bedrijf">Alleen bedrijfspagina's</option></select>
+    <select id="ll" aria-label="Label"><option value="">Alle labels</option><option>Hypo</option><option>Digi</option><option>Board</option></select>
+    <select id="lp" aria-label="Periode"><option value="7">Laatste 7 dagen</option><option value="30">Laatste 30 dagen</option><option value="90" selected>Laatste 90 dagen</option><option value="0">Alles</option></select>
+    <input type="search" id="lq" aria-label="Zoeken in LinkedIn-posts" placeholder="Zoek in posts…" style="flex:1;min-width:140px">
+  </div><div class="layout"><aside class="side" aria-label="Volglijst" id="lside"></aside><section class="mainp" id="lres" aria-live="polite"></section></div>`;
+  const kind = new Map(accounts.map((a) => [a.id, a.soort]));
+  let rq = 0;
+  const run2 = async () => {
+    const mine = ++rq;
+    $("#lres").innerHTML = `<div class="empty">Laden…</div>`;
+    let q = sb.from("linkedin_posts").select("*").order("post_datum", { ascending: false }).limit(300);
+    const n = +$("#lp").value;
+    if (n) q = q.gte("post_datum", new Date(Date.now() - n * 864e5).toISOString());
+    if ($("#lb").value) q = q.eq("bedrijf", $("#lb").value);
+    if ($("#ll").value) q = q.contains("labels", [$("#ll").value]);
+    const terms = $("#lq").value.replace(/[%,()\\]/g, " ").split(/\s+/).filter(Boolean).slice(0, 6);
+    terms.forEach((w) => { q = q.or(`kern.ilike.%${w}%,auteur.ilike.%${w}%,waarom.ilike.%${w}%,thema.ilike.%${w}%`); });
+    const { data, error } = await q;
+    if (mine !== rq || my !== rid) return;
+    if (error) return ($("#lres").innerHTML = `<div class="empty">Fout: ${esc(error.message)}</div>`);
+    const wie = $("#lw").value;
+    const posts = wie ? data.filter((p) => (kind.get(p.account_id) || (p.account_id ? "" : "persoon")) === wie) : data;
+    $("#lside").innerHTML = liSide(groups, posts, n, last);
+    if (!posts.length) {
+      $("#lres").innerHTML = `<div class="empty">Geen LinkedIn-posts in deze selectie.<br><span class="small">De radar neemt alleen posts op waarvan de plaatsingsdatum vaststaat. Kies een langere periode of een ander bedrijf.</span></div>`;
+      return;
+    }
+    $("#lres").innerHTML = groupBy(posts.map((p) => ({ ...p, _dag: liDay(p.post_datum) })), "_dag")
+      .map(([d, ps]) => `<div class="hit-date">${esc(lang(d))}</div><div class="block" style="margin-bottom:12px">${ps.map((p) => liItem(p)).join("").replace('class="item li"', 'class="item li" style="border-top:0"')}</div>`).join("")
+      + `<div class="foot">Bron: openbare LinkedIn-posts die via zoekmachines vindbaar zijn, en uitspraken van gevolgde bestuurders in de media. De samenvatting is in eigen woorden; open de link voor de volledige post. Een post verschijnt pas als de plaatsingsdatum vaststaat (uit de postlink zelf of uit het artikel), soms enkele dagen na plaatsing.</div>`;
+  };
+  ["lb", "lw", "ll", "lp"].forEach((id) => ($("#" + id).onchange = run2));
+  $("#lq").addEventListener("keydown", (e) => { if (e.key === "Enter") run2(); });
+  $("#lq").addEventListener("search", run2);
+  run2();
+}
+
+function liSide(groups, posts, n, last) {
+  const cnt = {}; posts.forEach((p) => (cnt[p.bedrijf || "?"] = (cnt[p.bedrijf || "?"] || 0) + 1));
+  const max = Math.max(1, ...Object.values(cnt));
+  const bars = groups.filter(([g]) => cnt[g]).map(([g]) => `<div class="lbar"><span class="lbn">${esc(g)}</span><span class="lbt"><span style="width:${Math.round((cnt[g] / max) * 100)}%"></span></span><span class="lbc">${cnt[g]}</span></div>`).join("");
+  const SIGNAAL = /signaal|controleren|wissel|vertrok|vertrek|niet meer|in de gaten/i;
+  const vl = groups.map(([g, as]) => `<div class="lg"><div class="lgh">${esc(g)}</div>` + [...as].sort((a, b) => (a.soort === "bedrijf" ? 0 : 1) - (b.soort === "bedrijf" ? 0 : 1) || a.prioriteit - b.prioriteit || a.naam.localeCompare(b.naam)).map((a) => {
+    const nm = safeUrl(a.linkedin_url) ? `<a href="${esc(a.linkedin_url)}" target="_blank" rel="noopener noreferrer">${esc(a.naam)}</a>` : esc(a.naam);
+    const sig = a.opmerking && SIGNAAL.test(a.opmerking);
+    const warn = sig ? ` <span class="warn" title="${esc(a.opmerking)}" aria-label="Let op: ${esc(a.opmerking)}">!</span>` : "";
+    const note = a.opmerking && !sig ? `<div class="small"><i>${esc(a.opmerking)}</i></div>` : "";
+    return `<div class="la${a.soort === "bedrijf" ? " co" : ""}">${nm}${warn}${a.functie ? `<div class="small">${esc(a.functie)}</div>` : ""}${note}${a.laatste_post ? `<div class="small">laatste post ${esc(dm(a.laatste_post))}</div>` : ""}</div>`;
+  }).join("") + `</div>`).join("");
+  const mobiel = window.matchMedia("(max-width:760px)").matches;
+  return `<div class="sh">Activiteit ${n ? `${n} dagen` : "totaal"}</div>${bars || `<div class="small">Geen posts in deze periode.</div>`}`
+    + `<details class="more"${mobiel ? "" : " open"}><summary>Volglijst (${groups.reduce((t, [, a]) => t + a.length, 0)} accounts)</summary>`
+    + `<div class="sh">Volglijst</div><div class="small" style="margin-bottom:6px">${groups.reduce((t, [, a]) => t + a.length, 0)} accounts. Een <span class="warn">!</span> is een signaal om te controleren (bijv. een mogelijke functiewissel); beweeg erover voor uitleg.</div>${vl}`
+    + (last ? `<div class="sh">Laatste run</div><div class="small">${esc(dmy(last.datum))}: ${last.toegevoegd} nieuw, ${last.overgeslagen} overgeslagen.</div>` : "")
+    + `</details>`;
 }
 
 // ---------- archief
