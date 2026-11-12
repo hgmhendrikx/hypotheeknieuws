@@ -98,9 +98,11 @@ async function editionView(soort, datum) {
   if (!list.length) { main.innerHTML = `<div class="empty">Nog geen ${soort === "week" ? "weekoverzichten" : "dagoverzichten"} in de database.</div>`; $("#sub").innerHTML = ""; return; }
   const cur = list.find((x) => x.datum === datum) || list[0];
   const idx = list.indexOf(cur);
-  // LinkedIn: dag = wat de run die ochtend vond; week = posts van zaterdag t/m vrijdag (zelfde venster als de weekmail)
-  let liQ = sb.from("linkedin_posts").select("*").order("relevantie", { ascending: false }).order("post_datum", { ascending: false }).limit(soort === "week" ? 8 : 12);
-  liQ = soort === "week" ? liQ.gte("post_datum", dayStart(cur.datum, -6)).lt("post_datum", dayStart(cur.datum, 1)).gte("relevantie", 2) : liQ.eq("gevonden_op", cur.datum);
+  // LinkedIn: dag = wat de run die ochtend vond; week = zelfde selectie als de weekmail (database-functie linkedin_week:
+  // geplaatst za t/m vr, plus eerder geplaatste posts die sinds de vorige weekmail zijn gevonden)
+  const liQ = soort === "week"
+    ? sb.rpc("linkedin_week", { p_datum: cur.datum })
+    : sb.from("linkedin_posts").select("*").eq("gevonden_op", cur.datum).order("relevantie", { ascending: false }).order("post_datum", { ascending: false }).limit(12);
   const [{ data: ed, error: e1 }, { data: items, error: e2 }, { data: k, error: e3 }, { data: prev }, { data: li }] = await Promise.all([
     sb.from("editions").select("*").eq("id", cur.id).single(),
     sb.from("items").select("*").eq("edition_id", cur.id).order("positie"),
@@ -191,8 +193,6 @@ function mainPanel(soort, ed, items, li) {
 }
 
 // ---------- LinkedIn-radar
-// Begin van een kalenderdag (lokale tijd, Nederland) als ISO-tijdstip, eventueel n dagen verschoven.
-function dayStart(s, n = 0) { const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + n); return d.toISOString(); }
 const LI_TZ = { timeZone: "Europe/Amsterdam" };
 const liDate = (ts) => { const d = new Date(ts); return `${+d.toLocaleString("nl-NL", { ...LI_TZ, day: "numeric" })}/${+d.toLocaleString("nl-NL", { ...LI_TZ, month: "numeric" })}`; };
 const liTime = (ts) => new Date(ts).toLocaleTimeString("nl-NL", { ...LI_TZ, hour: "2-digit", minute: "2-digit" });
@@ -205,7 +205,8 @@ function liItem(p, opts = {}) {
   const link = u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${p.gevonden_via === "media" ? esc(p.bron_naam || "bron") : "Bekijk op LinkedIn"}</a>` : "";
   const when = p.datum_bron === "activity_id" ? `geplaatst ${liDate(p.post_datum)} ${liTime(p.post_datum)}` : p.gevonden_via === "media" ? `artikel ${liDate(p.post_datum)}` : `geplaatst ${liDate(p.post_datum)}`;
   const found = p.gevonden_op && p.gevonden_op !== liDay(p.post_datum) ? `gevonden ${dm(p.gevonden_op)}` : "";
-  const via = p.gevonden_via === "media" ? `<span class="tag" title="Uitspraak uit de media; de LinkedIn-post zelf had geen vaststelbare datum">media</span>` : "";
+  const via = (p.gevonden_via === "media" ? `<span class="tag" title="Uitspraak uit de media; de LinkedIn-post zelf had geen vaststelbare datum">media</span>` : "")
+    + (p.laat ? ` <span class="tag" title="Geplaatst vóór deze week, maar pas na de vorige weekmail gevonden">eerder geplaatst, deze week gevonden</span>` : "");
   const head = `<span class="av" aria-hidden="true">${esc(initials(p.auteur))}</span><span>${esc(p.auteur)}${p.functie ? ` <span class="fn">· ${esc(p.functie)}</span>` : ""}</span>`;
   return item({ head, text: p.kern, sub: p.waarom ? `<b>Waarom relevant:</b> ${esc(p.waarom)}` : "", m: meta(dots(p.relevantie), pills(p.labels), opts.thema !== false && p.thema ? esc(p.thema) : "", esc(when), found, via, link) }).replace('class="item"', 'class="item li"');
 }

@@ -180,19 +180,15 @@ begin
   end loop;
   h := h || public.mail_block('Bedrijven in beeld', n, rows);
 
-  -- ---------- LinkedIn deze week (posts van de volglijst, zaterdag t/m vrijdag; zonder posts geen blok)
+  -- ---------- LinkedIn deze week (linkedin_week: geplaatst za t/m vr, plus laat gevonden posts sinds de vorige weekmail; zonder posts geen blok)
   rows := ''; n := 0;
-  for r in select p.* from linkedin_posts p
-           where p.post_datum >= ((ed.datum - 6)::timestamp at time zone 'Europe/Amsterdam')
-             and p.post_datum <  ((ed.datum + 1)::timestamp at time zone 'Europe/Amsterdam')
-             and p.relevantie >= 2
-           order by p.relevantie desc, p.post_datum desc limit 8 loop
+  for r in select * from public.linkedin_week(ed.datum) loop
     n := n + 1;
     rows := rows || public.mail_row(null,
       public.mail_esc(r.auteur) || case when coalesce(r.functie,'') <> '' then ' <span style="font-weight:normal;color:#64748B">· ' || public.mail_esc(r.functie) || '</span>' else '' end,
       r.kern,
       case when r.waarom is not null then '<b>Waarom relevant:</b> ' || public.mail_esc(r.waarom) else '' end,
-      public.mail_meta(array[public.mail_pills(to_jsonb(r.labels)), public.mail_dm((r.post_datum at time zone 'Europe/Amsterdam')::date),
+      public.mail_meta(array[public.mail_pills(to_jsonb(r.labels)), public.mail_dm((r.post_datum at time zone 'Europe/Amsterdam')::date), case when r.laat then 'eerder geplaatst, deze week gevonden' else '' end,
         public.mail_src(case when r.gevonden_via = 'media' then coalesce(r.bron_naam, 'bron') else 'Bekijk op LinkedIn' end, r.post_url)]));
   end loop;
   h := h || public.mail_block('LinkedIn deze week', n, rows);

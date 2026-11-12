@@ -226,6 +226,32 @@ begin
 end $fn$;
 
 revoke all on function public.linkedin_voeg_toe(jsonb) from public, anon, authenticated;
+
+-- Posts voor de weekmail en de weekweergave: geplaatst in de week (za t/m vr), plus posts die sinds de vorige
+-- weekmail (vrijdag ~10:00) zijn gevonden maar eerder geplaatst zijn (laat = true). Zo komt elke post precies één
+-- keer in een weekmail. Migratie `linkedin_week_laat_gevonden`. Uitvoerbaar voor ingelogde gebruikers (RLS geldt).
+create or replace function public.linkedin_week(p_datum date)
+returns table (id bigint, auteur text, functie text, bedrijf text, post_url text, post_datum timestamptz, datum_bron text,
+               gevonden_via text, bron_naam text, kern text, waarom text, thema text, labels text[], relevantie int,
+               gevonden_op date, laat boolean)
+language sql stable set search_path to 'public' as $fn$
+  with w as (
+    select (p_datum - 6)::timestamp at time zone 'Europe/Amsterdam' as van,
+           (p_datum + 1)::timestamp at time zone 'Europe/Amsterdam' as tot,
+           (p_datum - 7)::timestamp at time zone 'Europe/Amsterdam' + interval '9 hours 55 minutes' as vorige_mail,
+           p_datum::timestamp at time zone 'Europe/Amsterdam' + interval '9 hours 55 minutes' as deze_mail)
+  select p.id, p.auteur, p.functie, p.bedrijf, p.post_url, p.post_datum, p.datum_bron, p.gevonden_via, p.bron_naam,
+         p.kern, p.waarom, p.thema, p.labels, p.relevantie, p.gevonden_op, p.post_datum < w.van as laat
+  from linkedin_posts p, w
+  where p.relevantie >= 2
+    and ((p.post_datum >= w.van and p.post_datum < w.tot)
+      or (p.post_datum < w.van and p.created_at >= w.vorige_mail and p.created_at < w.deze_mail))
+  order by p.relevantie desc, p.post_datum desc
+  limit 10
+$fn$;
+revoke all on function public.linkedin_week(date) from public, anon;
+grant execute on function public.linkedin_week(date) to authenticated;
+
 revoke all on function public.linkedin_volglijst(date, int) from public, anon, authenticated;
 
 -- ---------- volglijst: startversie (functies vastgesteld op 12-11-2026; bron per regel)
