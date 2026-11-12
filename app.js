@@ -60,10 +60,12 @@ function showLogin() {
 }
 let started = false;
 function showApp() { signedIn = true; $("#login").hidden = true; $("#app").hidden = false; if (!started) { started = true; window.addEventListener("hashchange", route); } route(); }
+// Gebruikersnaam zonder @ wordt aangevuld met het vaste domein (bijv. "Achmea" -> achmea@hypotheekmarkt.nl)
+function loginEmail(v) { v = v.trim().toLowerCase(); return v.includes("@") ? v : v + "@hypotheekmarkt.nl"; }
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#loginErr").textContent = "";
-  const { error } = await sb.auth.signInWithPassword({ email: $("#email").value, password: $("#password").value });
+  const { error } = await sb.auth.signInWithPassword({ email: loginEmail($("#email").value), password: $("#password").value });
   if (error) $("#loginErr").textContent = "Inloggen mislukt: controleer e-mailadres en wachtwoord.";
 });
 $("#logout").addEventListener("click", () => sb.auth.signOut());
