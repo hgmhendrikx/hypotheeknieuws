@@ -82,6 +82,25 @@ select,input[type=search],input[type=date],input[type=email],input[type=password
 .login-card label{display:grid;gap:4px;font-size:13px;color:var(--mu)}
 
 
+/* LinkedIn-radar */
+.item.li .hd{display:flex;align-items:center;gap:8px;font-size:14px}
+.av{flex:none;width:26px;height:26px;border-radius:13px;background:#0A66C2;color:#fff;font-size:11px;font-weight:bold;display:inline-flex;align-items:center;justify-content:center;letter-spacing:.5px}
+.fn{font-weight:normal;color:var(--mu);font-size:13px}
+.rel{color:#0A66C2;letter-spacing:1px;font-size:10px}
+.tag{background:#F1F5F9;color:#475569;border:1px solid var(--ru);border-radius:6px;padding:0 5px;font-size:11px}
+.warn{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;border-radius:8px;background:#FEF3C7;color:#92400E;font-size:11px;font-weight:bold;cursor:help}
+.lbar{display:grid;grid-template-columns:78px 1fr 22px;gap:6px;align-items:center;font-size:12px;padding:2px 0}
+.lbn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbt{background:#E2E8F0;border-radius:4px;height:8px;overflow:hidden}
+.lbt span{display:block;height:100%;background:#0A66C2}
+.lbc{text-align:right;color:var(--mu)}
+.lg{margin-bottom:10px}
+.lgh{font-size:12px;font-weight:bold;padding:6px 0 2px;border-bottom:1px solid var(--ru)}
+.la{font-size:13px;padding:4px 0 2px}
+.la.co{font-weight:600}
+.la a{text-decoration:none}
+.la a:hover{text-decoration:underline}
+
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .more>summary{cursor:pointer;font-weight:600;color:var(--ac);padding:10px 0}

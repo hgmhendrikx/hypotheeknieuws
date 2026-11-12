@@ -97,5 +97,6 @@ create policy "alleen ingelogd lezen" on public.items for select to authenticate
 create policy "alleen ingelogd lezen" on public.kerncijfers for select to authenticated using (true);
 create policy "ingelogd leest bronnen" on public.bronnen for select to authenticated using (true);
 
+-- LinkedIn-radar (linkedin_accounts, linkedin_posts, linkedin_runs): zie linkedin.sql.
 -- Functies: zie functions.sql (maak die aan nadat de tabellen bestaan; items_set_nieuws_datum
 -- moet bestaan voordat de trigger wordt aangemaakt).
