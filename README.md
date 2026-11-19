@@ -9,7 +9,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Onderdeel | Waar | In deze repo |
 |---|---|---|
 | Website | statische bestanden, leest live uit Supabase na inloggen | `index.html`, `app.js`, `style.css`, `config.js` |
-| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
+| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
 | Dagelijkse runs | Geplande taken in Claude | `runs/*.md` (kopie van elke prompt) |
 
 ## Geplande taken
@@ -36,6 +36,13 @@ De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron 
 - Wijzigingen worden door Claude gepusht naar de branch `claude/updates`, nooit direct naar `main`.
 - Na review merge je naar `main`. Een statische host (GitHub Pages, Cloudflare Pages of Netlify) publiceert `main`.
 - Databasewijzigingen gaan via een Supabase-migratie. Leg ze daarna vast in `supabase/`.
+
+## Herhalingen, rente en buitenlandse bronnen (sinds 19-11-2026)
+
+- **Geen herhaald nieuws.** Dag- en feedrun krijgen via `eerder_nieuws(datum, 8)` het nieuws van de afgelopen 8 dagen (en de feedberichten van vandaag). Een bericht over een gebeurtenis die daar al in staat komt niet opnieuw, ook niet via een andere bron of als latere bespreking, tenzij er een nieuw feit is. Elk bericht van de dagrun krijgt een `gebeurd`-datum (datum van de gebeurtenis zelf); ligt die vóór de periode, dan haalt `bouw.py` het weg. `bouw.py` markeert kandidaten die op eerder nieuws lijken (tekstvergelijking). Links worden vergeleken na `norm_url` (www, hoofdletters, dubbele slash, utm-parameters), in de database én in het script; `import_edition` slaat links over die de afgelopen 21 dagen al in een dagedite stonden. Het weekoverzicht sluit berichten uit het vorige weekoverzicht uit (`week_kandidaten` geeft `vorige_week` mee).
+- **Rentewijzigingen zijn geen belangrijk nieuws.** Tariefwijzigingen van geldverstrekkers en rente-overzichten komen niet in de top (dag en week) en niet als los bericht; ze staan in het renteblok (`rente_wijzigingen`) en in `vooruitzicht`. ECB-rentebesluiten blijven gewoon nieuws.
+- **Nederlandse bronnen gaan voor.** Europese instellingen (ECB, EBA, Europese Commissie, ESMA, AMLA, BIS) zijn toegestaan. Een andere buitenlandse bron mag alleen als het over een Nederlandse partij, de Nederlandse markt of een gevolgd bedrijf gaat, of bij aantoonbaar grote Europese of wereldwijde impact; de dagrun moet daar een reden bij geven (`buitenland`), anders haalt `bouw.py` het weg. In de top alleen bij grote impact.
+- **Controle.** `top_signalen(datum, 'dag'|'week')` meldt herhaling, rente of buitenlandse bron in de top; de controle-run van 09:30 begint dan met "LET OP: top".
 
 ## Nieuwsbrief (weekmail)
 
