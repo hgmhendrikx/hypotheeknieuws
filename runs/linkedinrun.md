@@ -1,6 +1,6 @@
 # Hypotheekmarkt LinkedIn-radar
 
-- Schema: ma–vr 06:40 (Europe/Amsterdam) — `CRON_TZ=Europe/Amsterdam 40 6 * * 1-5`
+- Schema: maandag en donderdag 06:40 (Europe/Amsterdam) — `CRON_TZ=Europe/Amsterdam 40 6 * * 1,4` (sinds 23-11; daarvoor ma–vr). De run kijkt 14 dagen terug, dus twee keer per week geeft dezelfde dekking.
 - Taak-id: trig_01Sf1ZjbfRf2ichSY6H7sKDV
 - Model: claude-sonnet-5-5
 - Koppeling: Supabase (schrijft alleen via `public.linkedin_voeg_toe`)
