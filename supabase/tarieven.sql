@@ -123,15 +123,22 @@ end $f$;
 -- Opslaan en direct de uitkomst teruggeven.
 -- Invoer: {"datum":"JJJJ-MM-DD","paginas":[{"bron":"moneywise","pagina":"nhg_10","peil":"JJJJ-MM-DD",
 --          "regels":[["Lloyds Bank","Hypotheek (1)",4.15], ...]}, ...]}
--- Uitvoer: {"opgeslagen":N,"rente_wijzigingen":[...],"watch":[...],"eerste_stand":true|false}
+-- Uitvoer: {"opgeslagen":N,"rente_wijzigingen":[...],"watch":[...],"eerste_stand":true|false,"verouderd_overgeslagen":[...]}
+-- Sinds 23-11 (avond): een pagina met een oudere standdatum dan al bekend is, wordt overgeslagen (Moneywise geeft soms een verouderde pagina terug).
 create or replace function public.tarieven_opslaan(p jsonb)
  returns jsonb language plpgsql set search_path to 'public'
 as $f$
-declare d date := (p->>'datum')::date; pg jsonb; r jsonb; n int := 0; eerste boolean;
+declare d date := (p->>'datum')::date; pg jsonb; r jsonb; n int := 0; eerste boolean; oud text[] := '{}'; max_peil date;
 begin
   for pg in select * from jsonb_array_elements(coalesce(p->'paginas','[]')) loop
     if coalesce(pg->>'bron','') !~ '^(moneywise|argenta|vista)$' or coalesce(pg->>'pagina','') !~ '^(nhg_5|nhg_10|nhg_20|ltv100_10)$'
        or (pg->>'peil') is null then continue; end if;
+    -- een pagina met een oudere standdatum dan al bekend is (verouderde of gecachete pagina) wordt niet opgeslagen
+    select max(peil) into max_peil from tarieven where bron = pg->>'bron' and pagina = pg->>'pagina';
+    if max_peil is not null and (pg->>'peil')::date < max_peil then
+      oud := oud || ((pg->>'bron') || ' ' || (pg->>'pagina') || ' (stand ' || (pg->>'peil') || ')');
+      continue;
+    end if;
     delete from tarieven where datum = d and bron = pg->>'bron' and pagina = pg->>'pagina';
     for r in select * from jsonb_array_elements(coalesce(pg->'regels','[]')) loop
       begin
@@ -145,7 +152,7 @@ begin
     end loop;
   end loop;
   select not exists (select 1 from tarieven where bron = 'moneywise' and datum < d) into eerste;
-  return jsonb_build_object('opgeslagen', n, 'eerste_stand', eerste,
+  return jsonb_build_object('opgeslagen', n, 'eerste_stand', eerste, 'verouderd_overgeslagen', to_jsonb(oud),
     'rente_wijzigingen', public.tarief_wijzigingen(d, 'moneywise'), 'watch', public.watch_tarieven(d));
 end $f$;
 
@@ -153,3 +160,4 @@ revoke execute on function public.tarieven_opslaan(jsonb) from anon, authenticat
 
 -- Eenmalig: op 23-11-2026 is de stand van die dag (4 Moneywise-pagina's, tariefkaarten Argenta 20/11 en Vista 18/11)
 -- als startpunt opgeslagen, zodat de dagrun van 24-11 al wijzigingen kan bepalen.
+-- Op 23-11 (avond) is de NHG 10 jaar-stand van die dag teruggezet nadat een testrun hem had overschreven met een verouderde pagina (stand 27-10).
