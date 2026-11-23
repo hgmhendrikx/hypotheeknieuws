@@ -1,5 +1,7 @@
 -- Functies in schema public van de Hypotheeknieuwsdatabase.
 -- Gekopieerd uit de live database op 2026-11-06 (pg_get_functiondef).
+-- LET OP: voeg_items_toe, import_edition, wissel_top, week_kandidaten en import_week zijn op 19-11-2026 vervangen;
+-- de actuele versies staan in ontdubbeling.sql.
 -- Gebruikers: voeg_items_toe + wissel_top (feedrun), import_edition (dagrun),
 -- week_kandidaten + import_week (weekrun). sectie_van_categorie en items_set_nieuws_datum zijn hulpfuncties.
 -- Volgorde bij herstel: sectie_van_categorie, items_set_nieuws_datum, daarna de rest.
