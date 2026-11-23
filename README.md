@@ -9,7 +9,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Onderdeel | Waar | In deze repo |
 |---|---|---|
 | Website | statische bestanden, leest live uit Supabase na inloggen | `index.html`, `app.js`, `style.css`, `config.js` |
-| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
+| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
 | Dagelijkse runs | Geplande taken in Claude | `runs/*.md` (kopie van elke prompt) |
 
 ## Geplande taken
@@ -20,7 +20,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | ma–vr 06:55 | Feedrun: RSS en nieuwspagina's uit tabel `bronnen` | `runs/feedrun.md` |
 | ma–vr 07:10 | Dagrun: onderzoek door subagents, kerncijfers, top 3 | `runs/dagrun-onderzoek.md` |
 | vr 09:00 | Weekoverzicht, opgebouwd uit de dagedities | `runs/weekoverzicht.md` |
-| ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite, ook LinkedIn-run), meldt OK, LET OP of ALARM | `runs/controle-dagrun.md` |
+| ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite, ook LinkedIn-run en feedrun), meldt OK, LET OP of ALARM | `runs/controle-dagrun.md` |
 | vr 10:00 | Weekmail: weekoverzicht als HTML-nieuwsbrief in de mailbody naar guido.hendrikx2@achmea.nl | `runs/weekmail.md` |
 
 De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron van waarheid; houd de kopie bij als de taak verandert.
@@ -43,6 +43,15 @@ De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron 
 - **Rentewijzigingen zijn geen belangrijk nieuws.** Tariefwijzigingen van geldverstrekkers en rente-overzichten komen niet in de top (dag en week) en niet als los bericht; ze staan in het renteblok (`rente_wijzigingen`) en in `vooruitzicht`. ECB-rentebesluiten blijven gewoon nieuws.
 - **Nederlandse bronnen gaan voor.** Europese instellingen (ECB, EBA, Europese Commissie, ESMA, AMLA, BIS) zijn toegestaan. Een andere buitenlandse bron mag alleen als het over een Nederlandse partij, de Nederlandse markt of een gevolgd bedrijf gaat, of bij aantoonbaar grote Europese of wereldwijde impact; de dagrun moet daar een reden bij geven (`buitenland`), anders haalt `bouw.py` het weg. In de top alleen bij grote impact.
 - **Controle.** `top_signalen(datum, 'dag'|'week')` meldt herhaling, rente of buitenlandse bron in de top; de controle-run van 09:30 begint dan met "LET OP: top".
+
+## Bronnen, inhalen en blokkades (sinds 23-11-2026)
+
+- **Feeds in plaats van homepages.** InFinance (`infinance.nl/feed/`), Hypotheek Businessclub (`hypotheekbusinessclub.nl/feed/`) en Findinet (`findinet.nl/feed/`) worden als RSS gelezen; de homepages gaven maar een deel van de berichten met datum. Nieuw: AFM (`afm.nl/nl-nl/rss`) en NOS Economie (met zoekwoordenfilter). Consultancy.nl staat uit. AMweb blijft een pagina (geen werkende feed).
+- **Ritme.** `bronnen.ritme` is `dag` of `week`. Kifid staat op `week`: de feedrun leest het alleen op maandag (of als het langer dan 7 dagen geleden is).
+- **Inhalen.** De feedrun begint per bron bij het vroegste van "07:00 de ochtend ervoor" en `laatste_ok` (maximaal 7 dagen terug). Mislukt een run, dan haalt de volgende het gemiste nieuws in. WordPress-feeds die te kort zijn, worden aangevuld met `?paged=2`.
+- **Snel stoppen.** Is WebFetch in de run niet beschikbaar, dan stopt de feedrun meteen met FOUT (geen subagents of omwegen) en blijft `laatste_ok` staan.
+- **Controle.** De controle van 09:30 meldt "ALARM: feedrun" als geen enkele dagbron vandaag gelukt is, en "LET OP: feedrun deels" als een deel mislukte.
+- **Geblokkeerde domeinen.** Tabel `geblokkeerde_domeinen`. Feed- en dagrun lezen `geblokkeerd()` (gemeld in de afgelopen 14 dagen) en openen daar geen artikelpagina's; nieuwe blokkades melden ze via `meld_blokkade(jsonb)`. Een domein dat 14 dagen niet is gemeld, valt vanzelf van de lijst en wordt dan weer geprobeerd. De lijst geldt niet voor de feeds zelf.
 
 ## Nieuwsbrief (weekmail)
 
