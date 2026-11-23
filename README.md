@@ -9,18 +9,19 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Onderdeel | Waar | In deze repo |
 |---|---|---|
 | Website | statische bestanden, leest live uit Supabase na inloggen | `index.html`, `app.js`, `style.css`, `config.js` |
-| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
+| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/feeds.sql`, `supabase/tarieven.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
 | Dagelijkse runs | Geplande taken in Claude | `runs/*.md` (kopie van elke prompt) |
 
 ## Geplande taken
 
 | Tijd (Europe/Amsterdam) | Taak | Bestand |
 |---|---|---|
-| ma–vr 06:40 | LinkedIn-radar: posts van de volglijst (bedrijven en bestuurders) | `runs/linkedinrun.md` |
-| ma–vr 06:55 | Feedrun: RSS en nieuwspagina's uit tabel `bronnen` | `runs/feedrun.md` |
-| ma–vr 07:10 | Dagrun: onderzoek door subagents, kerncijfers, top 3 | `runs/dagrun-onderzoek.md` |
+| elk uur :50 (UTC) | Database (pg_cron): `feeds_ophalen()` haalt alle RSS-feeds op in `feed_ruw` | `supabase/feeds.sql` |
+| ma en do 06:40 | LinkedIn-radar: posts van de volglijst (bedrijven en bestuurders), 14 dagen terug | `runs/linkedinrun.md` |
+| ma–vr 06:55 | Feedrun: beoordeelt de onverwerkte feeditems uit `feed_ruw` en leest de nieuwspagina's | `runs/feedrun.md` |
+| ma–vr 07:10 | Dagrun: onderzoek door 6 subagents, kerncijfers, tarieven, top 3 | `runs/dagrun-onderzoek.md` |
 | vr 09:00 | Weekoverzicht, opgebouwd uit de dagedities | `runs/weekoverzicht.md` |
-| ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite, ook LinkedIn-run en feedrun), meldt OK, LET OP of ALARM | `runs/controle-dagrun.md` |
+| ma–vr 09:30 | Controle (alleen lezen, vrijdag ook weekedite, feeds en feedrun, LinkedIn op ma en do), meldt OK, LET OP of ALARM | `runs/controle-dagrun.md` |
 | vr 10:00 | Weekmail: weekoverzicht als HTML-nieuwsbrief in de mailbody naar guido.hendrikx2@achmea.nl | `runs/weekmail.md` |
 
 De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron van waarheid; houd de kopie bij als de taak verandert.
@@ -52,6 +53,14 @@ De prompts in `runs/` zijn kopieën. De geplande taak zelf in Claude is de bron 
 - **Snel stoppen.** Is WebFetch in de run niet beschikbaar, dan stopt de feedrun meteen met FOUT (geen subagents of omwegen) en blijft `laatste_ok` staan.
 - **Controle.** De controle van 09:30 meldt "ALARM: feedrun" als geen enkele dagbron vandaag gelukt is, en "LET OP: feedrun deels" als een deel mislukte.
 - **Geblokkeerde domeinen.** Tabel `geblokkeerde_domeinen`. Feed- en dagrun lezen `geblokkeerd()` (gemeld in de afgelopen 14 dagen) en openen daar geen artikelpagina's; nieuwe blokkades melden ze via `meld_blokkade(jsonb)`. Een domein dat 14 dagen niet is gemeld, valt vanzelf van de lijst en wordt dan weer geprobeerd. De lijst geldt niet voor de feeds zelf.
+
+## Feeds in de database en tarieven (sinds 23-11-2026, middag)
+
+- **Feeds zonder AI.** `feeds_ophalen()` (pg_cron, elk uur op minuut 50 UTC) haalt alle actieve rss-bronnen op met de `http`-extensie, leest de items met xpath en zet nieuwe items in `feed_ruw` (unieke link per bron, items ouder dan 30 dagen worden overgeslagen). Bij bronnen met `filter_modus = 'zoekwoorden'` worden items zonder trefwoord (`feed_trefwoord`) meteen als verwerkt gemarkeerd, net als items waarvan de link al in een editie staat. `bronnen.laatste_ok`/`laatste_fout` van rss-bronnen worden door deze functie bijgehouden.
+- **Feedrun.** Leest `feed_nieuw(van, tot)` (onverwerkte items, 7 dagen terug), beoordeelt en schrijft via `voeg_items_toe`, en meldt alle beoordeelde items af met `feed_verwerkt(jsonb)`, dat ook een regel in `feed_runs` schrijft. Een gemiste dag wordt dus vanzelf ingehaald. Alleen pagina-bronnen (AMweb, wekelijks Kifid) leest de run nog zelf.
+- **Tarieven.** Opdracht D van de dagrun geeft de volledige Moneywise-tabellen (5, 10, 20 jaar NHG en 10 jaar 100% LTV) en de tariefkaarten van Argenta en Vista door aan `tarieven_opslaan(jsonb)`. De database bepaalt dan zelf `rente_wijzigingen` (laagste reguliere tarief per verstrekker, vergeleken met de vorige stand met een oudere peildatum; groene producten tellen niet mee) en de watchlist (`watch_tarieven`). Tabel `tarieven`.
+- **Dagrun.** Zes subagents: M1 markt en keten, M2 AI, M3 cijfers/strategie/personalia, C bedrijvenmonitor (haiku), T toezicht en compliance, D kerncijfers/tarieven/vooruitzicht (sonnet). Op vrijdag schrijft de hoofdrun de duiding uit het nieuws van de week.
+- **LinkedIn-radar** draait op maandag en donderdag; de run kijkt 14 dagen terug.
 
 ## Nieuwsbrief (weekmail)
 
