@@ -9,7 +9,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Onderdeel | Waar | In deze repo |
 |---|---|---|
 | Website | statische bestanden, leest live uit Supabase na inloggen | `index.html`, `app.js`, `style.css`, `config.js` |
-| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/feeds.sql`, `supabase/tarieven.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
+| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/feeds.sql`, `supabase/tarieven.sql`, `supabase/runs.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
 | Dagelijkse runs | Geplande taken in Claude | `runs/*.md` (kopie van elke prompt) |
 
 ## Geplande taken

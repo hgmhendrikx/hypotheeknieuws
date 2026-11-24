@@ -106,6 +106,8 @@ begin
         if lnk is null or lnk !~ '^https?://' then continue; end if;
         dt := public.rss_datum(public.xml_tekst((xpath('/item/pubDate/text()', it))[1]::text));
         if dt is not null and dt < now() - interval '30 days' then continue; end if;
+        -- sinds 24-11: een publicatietijd in de toekomst (Banken.nl dateert berichten vooruit) wordt het ophaalmoment
+        if dt > now() then dt := now(); end if;
         ttl := public.xml_tekst((xpath('/item/title/text()', it))[1]::text);
         ds := left(public.xml_tekst((xpath('/item/description/text()', it))[1]::text), 1000);
         tw := b.filter_modus = 'alles' or public.feed_trefwoord(coalesce(ttl,'') || ' ' || coalesce(ds,''))
@@ -174,6 +176,9 @@ revoke execute on function public.feed_verwerkt(jsonb) from anon, authenticated;
 -- Elk uur op minuut 50 (UTC); de run van 05:50 UTC (06:50 in de winter) is net vóór de feedrun van 06:55.
 select cron.unschedule(jobid) from cron.job where jobname = 'feeds_ophalen';
 select cron.schedule('feeds_ophalen', '50 * * * *', 'select public.feeds_ophalen()');
+
+-- Eenmalig op 24-11-2026: vooruit gedateerde items teruggezet naar hun ophaalmoment:
+-- update public.feed_ruw set gepubliceerd = opgehaald_at where gepubliceerd > opgehaald_at;
 
 -- Eenmalig bij de start (23-11-2026): items van vóór de laatste geslaagde feedrun (19-11 06:58) als verwerkt gemarkeerd:
 -- update public.feed_ruw set verwerkt_at = now(), uitkomst = 'voor start (al door feedrun beoordeeld)'

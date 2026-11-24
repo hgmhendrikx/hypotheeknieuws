@@ -39,12 +39,18 @@ as $f$
   select nullif(split_part(split_part(regexp_replace(lower(btrim(coalesce(u,''))), '^(https?://)?(www\.)?', ''), '/', 1), ':', 1), '')
 $f$;
 
--- Actieve blokkades: gemeld in de afgelopen p_dagen dagen. Vorm: [{"domein":..,"reden":..,"sinds":..}]
+-- Actieve blokkades. Vorm: [{"domein":..,"reden":..,"sinds":..}]
+-- Sinds 24-11: een domein telt pas mee als het op minstens 2 verschillende dagen is gemeld (keer >= 2),
+-- en een tijdelijke weigering (rate limit, time-out, geweigerd door de toestemmingscontrole) telt maar 3 dagen;
+-- structurele blokkades (robots, betaalmuur, browsercontrole) blijven p_dagen (14) dagen staan.
 create or replace function public.geblokkeerd(p_dagen int default 14)
  returns jsonb language sql stable set search_path to 'public'
 as $f$
   select coalesce(jsonb_agg(jsonb_build_object('domein', domein, 'reden', reden, 'sinds', eerst_gezien) order by domein), '[]'::jsonb)
-  from geblokkeerde_domeinen where laatst_gezien >= current_date - p_dagen
+  from geblokkeerde_domeinen
+  where keer >= 2
+    and laatst_gezien >= current_date - case when reden ~* '(rate.?limit|tijdelijk|time.?out|toestemming|geweigerd|niet beschikbaar)'
+                                             then least(p_dagen, 3) else p_dagen end
 $f$;
 
 -- Meldt blokkades. Invoer: [{"domein":"emerce.nl","reden":"robots"}] of {"blokkades":[...]}; domein mag ook een volledige URL zijn.
@@ -79,3 +85,22 @@ select public.meld_blokkade('[
  {"domein":"rd.nl","reden":"pagina geblokkeerd"},
  {"domein":"vastgoedbs.nl","reden":"artikel niet te openen"}
 ]'::jsonb);
+
+-- 24-11-2026: drempel van 2 meldingen (zie geblokkeerd()). De startvulling hierboven kwam uit meerdere
+-- niet_gevonden-meldingen van november; de structurele blokkades daaruit tellen daarom als 2 meldingen.
+-- banken.nl (één rate limit), rd.nl en vastgoedbs.nl blijven op 1 en worden weer geprobeerd.
+update public.geblokkeerde_domeinen set keer = greatest(keer, 2)
+ where domein in ('fd.nl','nu.nl','emerce.nl','globalcapital.com','pensioenpro.nl','stater.nl','bloomberg.com','vastgoedjournaal.nl');
+
+-- 24-11-2026: extra RSS-bronnen (door de database zelf opgehaald). Emerce heeft geen bruikbare feed (browsercontrole).
+insert into public.bronnen (naam, instantie, feed_url, type, sectie, categorie, labels, filter_modus, ritme)
+values
+  ('HDN nieuws', 'HDN', 'https://www.hdn.nl/feed/', 'rss', 'nieuws', null, '{Hypo,Digi}', 'alles', 'dag'),
+  ('CBS bouwen en wonen', 'CBS', 'https://www.cbs.nl/nl-nl/rss-feeds/bouwen-en-wonen', 'rss', 'nieuws', 'Markt & onderzoek', '{Hypo,Board}', 'zoekwoorden', 'dag'),
+  ('Computable', 'Computable', 'https://www.computable.nl/rss', 'rss', 'nieuws', null, '{Digi}', 'zoekwoorden', 'dag')
+on conflict (feed_url) do nothing;
+-- Eenmalig na de eerste ophaalronde: items van deze drie bronnen van vóór 24-11 07:00 als verwerkt gemarkeerd,
+-- zodat de feedrun geen oud nieuws krijgt:
+-- update public.feed_ruw f set verwerkt_at = now(), uitkomst = 'voor start (nieuwe bron)'
+--  from public.bronnen b where b.id = f.bron_id and b.feed_url in (...) and f.verwerkt_at is null
+--  and coalesce(f.gepubliceerd, f.opgehaald_at) < '2026-11-24 07:00:00+01';
