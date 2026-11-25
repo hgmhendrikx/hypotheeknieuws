@@ -9,7 +9,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Onderdeel | Waar | In deze repo |
 |---|---|---|
 | Website | statische bestanden, leest live uit Supabase na inloggen | `index.html`, `app.js`, `style.css`, `config.js` |
-| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/feeds.sql`, `supabase/tarieven.sql`, `supabase/runs.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
+| Database | Supabase-project `Hypotheeknieuwsdatabase` (`bxxoimlsvkpauatfxuqz`, eu-west-1) | `supabase/schema.sql`, `supabase/functions.sql`, `supabase/ontdubbeling.sql`, `supabase/bronnen_blokkades.sql`, `supabase/feeds.sql`, `supabase/pagina.sql`, `supabase/tarieven.sql`, `supabase/runs.sql`, `supabase/mail.sql`, `supabase/linkedin.sql` |
 | Dagelijkse runs | Geplande taken in Claude | `runs/*.md` (kopie van elke prompt) |
 
 ## Geplande taken
@@ -17,6 +17,7 @@ Geplande taken (Claude)  ──schrijven──▶  Supabase (data)  ◀──lez
 | Tijd (Europe/Amsterdam) | Taak | Bestand |
 |---|---|---|
 | elk uur :50 (UTC) | Database (pg_cron): `feeds_ophalen()` haalt alle RSS-feeds op in `feed_ruw` | `supabase/feeds.sql` |
+| elk uur :53 (UTC) | Database (pg_cron): `artikelen_ophalen()` leest AMweb en Kifid (nieuwe artikelen naar `feed_ruw`) en de artikelpagina's van onbeoordeelde feeditems (naar `pagina_cache`); de runs lezen pagina's met `pagina_lezen()` in plaats van WebFetch | `supabase/pagina.sql` |
 | ma en do 06:40 | LinkedIn-radar: posts van de volglijst (bedrijven en bestuurders), 14 dagen terug | `runs/linkedinrun.md` |
 | ma–vr 06:55 | Feedrun: beoordeelt de onverwerkte feeditems uit `feed_ruw` en leest de nieuwspagina's | `runs/feedrun.md` |
 | ma–vr 07:10 | Dagrun: onderzoek door 6 subagents, kerncijfers, tarieven, top 3 | `runs/dagrun-onderzoek.md` |
