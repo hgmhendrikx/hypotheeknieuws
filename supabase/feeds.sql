@@ -81,6 +81,39 @@ as $f$
     or (coalesce(t,'') ~ '\mWwft\M' and coalesce(t,'') ~* '(bank|krediet)')
 $f$;
 
+-- Sinds 27-11-2026: berichten over gebeurtenissen die de ECB-rente kunnen raken.
+-- A: wissel in de top van ECB of DNB (functie en wissel in dezelfde zin)
+-- B: rentestap of renteverwachting van de ECB
+-- D: inflatiecijfer eurozone (met percentage)
+-- Gewone toespraken en interviews van ECB-bestuurders vallen er bewust buiten.
+create or replace function public.ecb_rente_trefwoord(t text)
+returns boolean language plpgsql immutable set search_path to 'public' as $f$
+declare
+  e text := '\m(ecb|europese centrale bank|european central bank|dnb|de nederlandsche bank)\M';
+  f text := '\m(president|presidente|voorzitter|vicepresident|vice-president|hoofdeconoom|chief economist|directielid|directie|executive board)\M';
+  r text;
+  c text := '(opvolg|benoem|voorgedragen|voordracht|kandida|genomineerd|nominat|appoint|successor|succeed|aftreden|\mstapt\M[^.]{0,25}\mop\M|\mtreedt\M[^.]{0,25}\maf\M|vervroegd|vertrekt|\mvertrek\M|steps? down|resign|nieuwe (ecb-)?president|new president|future president|wordt (de )?nieuwe)';
+begin
+  t := coalesce(t, '');
+  r := '(ecb-(president|presidente|voorzitter|vicepresident|vice-president|directie|directielid|hoofdeconoom|top)|dnb-president|lagarde|'
+       || e || '[^.]{0,50}' || f || '|' || f || '[^.]{0,30}' || e || ')';
+  -- A. topwissel
+  if t ~* (r || '[^.]{0,100}' || c) or t ~* (c || '[^.]{0,100}' || r) or t ~* (e || '[^.]{0,80}' || c || '[^.]{0,60}' || f) then
+    return true;
+  end if;
+  -- B. rentestap of renteverwachting
+  if t ~* '(renteverlag|renteverhog|renteknip|rentestap|rentepauze|depositorente|beleidsrente|renteverwachting|rentepad|rate cuts?\M|rate hikes?|rate rises?|rate increases?|interest rates? (unchanged|on hold)|deposit (facility )?rate|policy rate|rate path|rate expectations|(verhoogt|verlaagt|verhogen|verlagen|houdt|laat) de rente|rente (ongewijzigd|onveranderd|gelijk))'
+     and t ~* '(\mECB\M|ecb-|europese centrale bank|european central bank|lagarde|eurozone|eurogebied|euro area)' then
+    return true;
+  end if;
+  -- D. inflatiecijfer eurozone
+  if t ~* '(inflatie|inflation|\mHICP\M)[^.]{0,80}[0-9]+([,.][0-9]+)? ?(%|procent|percent)'
+     and t ~* '(eurozone|eurogebied|euro area|eurolanden|\mECB\M)' then
+    return true;
+  end if;
+  return false;
+end $f$;
+
 create or replace function public.feeds_ophalen()
  returns jsonb language plpgsql set search_path to 'public', 'extensions'
 as $f$
@@ -111,7 +144,9 @@ begin
         ttl := public.xml_tekst((xpath('/item/title/text()', it))[1]::text);
         ds := left(public.xml_tekst((xpath('/item/description/text()', it))[1]::text), 1000);
         tw := b.filter_modus = 'alles' or public.feed_trefwoord(coalesce(ttl,'') || ' ' || coalesce(ds,''))
-              or (b.instantie = 'ECB' and coalesce(ttl,'') ~* 'monetary policy decision');
+              or (b.instantie = 'ECB' and coalesce(ttl,'') ~* 'monetary policy decision')
+              -- sinds 27-11: ECB-topwissels, rentestappen en inflatie eurozone
+              or public.ecb_rente_trefwoord(coalesce(ttl,'') || '. ' || coalesce(ds,''));
         insert into feed_ruw (bron_id, link, link_norm, titel, beschrijving, gepubliceerd, trefwoord, verwerkt_at, uitkomst)
         values (b.id, lnk, public.norm_url(lnk), ttl, ds, dt, tw,
                 case when tw then null else now() end, case when tw then null else 'geen trefwoord' end)
